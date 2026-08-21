@@ -1370,3 +1370,26 @@ body {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+/* 카카오 시그니처 버튼 & 배지 */
+.toss-btn-kakao {
+  background: #FEE500;
+  color: #191919;
+  font-weight: 800;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.toss-btn-kakao:hover {
+  background: #FADA0A;
+}
+
+.kakao-cat-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3C1E1E;
+  background: #FFF9D2;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-bottom: 6px;
+}

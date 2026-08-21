@@ -1,4 +1,4 @@
-﻿/**
+/**
  * [회식의 정석 - TDS 인터랙션 & 리액티브 컨트롤러]
  */
 
@@ -426,9 +426,13 @@ function renderResults() {
 
     const heroCard = document.createElement("div");
     heroCard.className = "hero-restaurant-box";
+    const kakaoDetail = hero.category_detail ? `<div class="kakao-cat-pill">🏷️ ${hero.category_detail}</div>` : '';
+    const kakaoLink = hero.kakao_search_url || `https://map.kakao.com/link/search/${encodeURIComponent(hero.name + " 성남")}`;
+
     heroCard.innerHTML = `
       <div class="hero-top-row">
         <div>
+          ${kakaoDetail}
           <h3 class="hero-main-name">${hero.name}</h3>
         </div>
         <div class="hero-score-pill">${hero.score}점</div>
@@ -456,11 +460,14 @@ function renderResults() {
       </div>
 
       <div class="hero-action-buttons">
+        <a href="${kakaoLink}" target="_blank" rel="noopener noreferrer" class="toss-btn toss-btn-kakao toss-btn-l" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          카카오맵 메뉴판·주차 확인 ↗
+        </a>
         <button type="button" class="toss-btn toss-btn-brand toss-btn-l" onclick="focusRestaurant(${hero.id}, ${hero.lat}, ${hero.lng})">
-          지도에서 위치 보기 📍
+          지도 위치 📍
         </button>
         <a href="tel:${hero.tel}" class="toss-btn toss-btn-secondary toss-btn-l">
-          전화 문의 📞
+          전화 📞
         </a>
       </div>
     `;
@@ -475,6 +482,7 @@ function renderResults() {
     const card = document.createElement("div");
     card.className = "subtop-card-item";
     const tagsHtml = (r.tags || []).slice(0, 2).map(t => `<span class="hero-tag-item">#${t}</span>`).join("");
+    const kakaoLink = r.kakao_search_url || `https://map.kakao.com/link/search/${encodeURIComponent(r.name + " 성남")}`;
 
     card.innerHTML = `
       <div class="subtop-rank-lbl">${rankNum === 2 ? '🥈 2순위 추천' : '🥉 3순위 추천'} (${r.score}점)</div>
@@ -482,9 +490,11 @@ function renderResults() {
       <div style="font-size: 13px; color: #6b7684; margin-bottom: 4px;">${r.category} · ${r.area || 50}㎡</div>
       <div class="subtop-item-price">1인 약 ${r.avgPrice.toLocaleString()}원</div>
       <div style="margin-bottom: 12px;">${tagsHtml}</div>
-      <div class="subtop-bottom-row">
-        <span style="font-size: 12px; color: #8b95a1;">${(r.address_road || r.address_jibun).split(' ').slice(2, 4).join(' ')}</span>
-        <button type="button" class="toss-btn toss-btn-secondary" style="font-size: 12px; padding: 4px 10px; border-radius: 8px;" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
+      <div class="subtop-bottom-row" style="display: flex; gap: 6px; align-items: center; justify-content: space-between;">
+        <a href="${kakaoLink}" target="_blank" rel="noopener noreferrer" class="toss-btn toss-btn-kakao" style="font-size: 11px; padding: 4px 8px; border-radius: 8px; text-decoration: none;">
+          메뉴·주차 ↗
+        </a>
+        <button type="button" class="toss-btn toss-btn-secondary" style="font-size: 11px; padding: 4px 8px; border-radius: 8px;" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
           지도 📍
         </button>
       </div>
@@ -499,6 +509,8 @@ function renderResults() {
     const rankNum = idx + 4;
     const row = document.createElement("div");
     row.className = "others-row-item";
+    const kakaoLink = r.kakao_search_url || `https://map.kakao.com/link/search/${encodeURIComponent(r.name + " 성남")}`;
+
     row.innerHTML = `
       <div style="display: flex; align-items: center; gap: 12px;">
         <span class="others-rank-badge">${rankNum}위</span>
@@ -507,9 +519,14 @@ function renderResults() {
           <div class="others-row-meta">${r.category} · 1인 약 ${r.avgPrice.toLocaleString()}원 · ${r.area || 50}㎡</div>
         </div>
       </div>
-      <button type="button" class="toss-btn toss-btn-text" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
-        위치보기 ➔
-      </button>
+      <div style="display: flex; gap: 6px;">
+        <a href="${kakaoLink}" target="_blank" rel="noopener noreferrer" class="toss-btn toss-btn-kakao" style="font-size: 11px; padding: 4px 8px; border-radius: 8px; text-decoration: none;">
+          메뉴 ↗
+        </a>
+        <button type="button" class="toss-btn toss-btn-text" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
+          위치 ➔
+        </button>
+      </div>
     `;
     DOM.othersListContainer.appendChild(row);
   });

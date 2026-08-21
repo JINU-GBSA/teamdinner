@@ -1,4 +1,4 @@
-﻿/**
+/**
  * [회식의 정석 - TDS 스타일 지도 렌더러]
  * - Leaflet & OpenStreetMap 기반
  * - 토스 감성의 커스텀 마커 & 미니멀 팝업
@@ -98,8 +98,13 @@ const DinnerMap = {
             🏷️ ${r.category} · 1인 <strong>${r.avgPrice.toLocaleString()}원</strong>
           </div>
           <div style="font-size: 11px; color: #8B95A1; margin-bottom: 8px;">📍 ${r.address_road || r.address_jibun}</div>
-          <div style="font-size: 12px; font-weight: 700; color: #3182F6;">
-            📞 <a href="tel:${r.tel}" style="color: #3182F6; text-decoration: none;">${r.tel}</a>
+          <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; border-top: 1px solid #f2f4f6; padding-top: 6px;">
+            <a href="${r.kakao_search_url || `https://map.kakao.com/link/search/${encodeURIComponent(r.name + " 성남")}`}" target="_blank" rel="noopener noreferrer" style="background: #FEE500; color: #191919; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; text-decoration: none;">
+              카카오맵 메뉴판 ↗
+            </a>
+            <div style="font-size: 12px; font-weight: 700; color: #3182F6;">
+              📞 <a href="tel:${r.tel}" style="color: #3182F6; text-decoration: none;">${r.tel}</a>
+            </div>
           </div>
         </div>
       `;
