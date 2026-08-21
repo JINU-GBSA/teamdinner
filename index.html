@@ -1,0 +1,236 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>회식의 정석 - 스마트 회식 플래너 (분당구 특화)</title>
+
+  <!-- Leaflet.js (오픈소스 지도 - 무료, API 키 불필요) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- 앱 커스텀 스타일 -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="container">
+    <!-- 앱 상단 헤더 -->
+    <header class="app-header">
+      <span class="badge-zero">⚡ 성남시 분당구 공공데이터 9,400+개소 탑재</span>
+      <h1 class="app-title">🍽️ 회식의 정석</h1>
+      <p class="app-subtitle">일정 취합 · 면적/가성비/역세권 다면 분석 · 최적 식당 Top 3 및 추가 후보 추천</p>
+    </header>
+
+    <!-- STEP 1: 일정 투표 및 참석자 취합 -->
+    <section id="step1" class="step-card active">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <h2 class="step-title">참석자 일정 투표 및 취합</h2>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">참석자 이름 및 가능 일정 추가</label>
+        <div class="member-input-row">
+          <input type="text" id="inputMemberName" class="input-text" placeholder="참석자 이름 (예: 홍길동)" style="max-width: 180px;">
+          <div id="dateCheckboxesContainer" class="chips-group" style="flex: 1;"></div>
+          <button type="button" id="btnAddMember" class="btn btn-primary">추가</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="margin-bottom: 0;">현재 투표 현황</label>
+          <span id="memberCountBadge" style="font-size: 12px; color: var(--text-muted);">현재 취합 인원: 0명</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="styled-table">
+            <thead>
+              <tr>
+                <th style="width: 25%;">이름</th>
+                <th style="width: 60%;">참석 가능 일자</th>
+                <th style="width: 15%;">관리</th>
+              </tr>
+            </thead>
+            <tbody id="memberTableBody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="btnFillSample" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+          🎲 가상 팀원 샘플 데이터 채우기 (시뮬레이터)
+        </button>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="btnNextToStep2" class="btn btn-primary">다음 단계 (지역 & 메뉴) ➔</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: 지역 및 메뉴 선호/기피 -->
+    <section id="step2" class="step-card">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <h2 class="step-title">회식 지역 및 메뉴 선호도</h2>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">희망 회식 권역 (성남시 분당구 오피스 밀집 지역)</label>
+        <select id="selectRegion" class="select-box">
+          <option value="분당구 전체" selected>📍 분당구 전체 (판교, 정자, 서현, 야탑 등)</option>
+          <option value="판교/삼평/백현">🏢 판교 테크노밸리 / 삼평동 / 백현동</option>
+          <option value="정자/미금">☕ 정자동 카페거리 / 정자역 / 미금역</option>
+          <option value="서현/수내">🛍️ 서현역 로데오 / 수내역 상권</option>
+          <option value="야탑/이매">🚇 야탑역 먹자골목 / 이매동</option>
+          <option value="성남 수정/중원">🏙️ 성남 수정구 / 태평동 / 모란</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">선호 메뉴 카테고리 (복수 선택 가능)</label>
+        <div class="chips-group">
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="돼지고기/삼겹살" checked>돼지고기/삼겹살</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="소고기/한우" checked>소고기/한우</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="회/해산물">회/해산물/사시미</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="중식/요리">중식/요리</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="양식/수제맥주">양식/수제맥주/펍</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryPref" value="한식/전골/닭">한식/전골/닭</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">⚠️ 기피 메뉴 (알레르기 / 비선호 배제)</label>
+        <div class="chips-group">
+          <label class="checkbox-chip"><input type="checkbox" name="categoryDislike" value="회/해산물">날것(회/해산물)</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryDislike" value="돼지고기/삼겹살">돼지고기</label>
+          <label class="checkbox-chip"><input type="checkbox" name="categoryDislike" value="중식/요리">중식/기름진 음식</label>
+        </div>
+      </div>
+
+      <div class="btn-row-space">
+        <button type="button" id="btnPrevToStep1" class="btn btn-secondary">⬅ 이전</button>
+        <button type="button" id="btnNextToStep3" class="btn btn-primary">다음 단계 (예산 & 조건) ➔</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: 예산 및 제약 조건 -->
+    <section id="step3" class="step-card">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <h2 class="step-title">1인당 예산 & 필수 제약 조건</h2>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">1인당 타겟 예산 (주류/음료 포함 예상가)</label>
+        <div class="slider-container">
+          <input type="range" id="budgetSlider" min="15000" max="80000" step="5000" value="28000">
+          <span id="budgetValue" class="slider-value">28,000원</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">필수 제약 조건 (Hard Constraints)</label>
+        <div class="chips-group">
+          <label class="checkbox-chip"><input type="checkbox" id="chkRoom" checked>🚪 개별 룸/단체석 구비</label>
+          <label class="checkbox-chip"><input type="checkbox" id="chkParking" checked>🚗 주차 가능</label>
+          <label class="checkbox-chip"><input type="checkbox" id="chkReserve" checked>📅 예약 가능</label>
+        </div>
+      </div>
+
+      <div class="btn-row-space">
+        <button type="button" id="btnPrevToStep2" class="btn btn-secondary">⬅ 이전</button>
+        <button type="button" id="btnCalculate" class="btn btn-success" style="font-size: 15px; padding: 12px 24px;">
+          ✨ 최적 회식 장소 다면 분석 & 추천 받기
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 4: 결과 화면 (Top 3 비교 + 지도 + 추가 후보군 더보기 + 텍스트 공지) -->
+    <section id="step4" class="step-card">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <h2 class="step-title">🎉 최종 회식 분석 & 식당 추천 결과</h2>
+      </div>
+
+      <!-- 요약 대시보드 -->
+      <div class="summary-grid">
+        <div class="summary-box">
+          <div class="summary-title">🗓️ 최다 참석 확정일</div>
+          <div id="resBestDate" class="summary-value" style="color: var(--primary);">2026-08-26(수)</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-title">👥 참석률 & 인원</div>
+          <div id="resAttendanceRate" class="summary-value">100% (6명)</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-title">💰 1인 타겟 / 팀 예상 총비용</div>
+          <div id="resTotalBudget" class="summary-value" style="color: #059669;">168,000원</div>
+          <div id="resPerPersonBudget" style="font-size: 11px; color: var(--text-muted);">28,000원 / 1인</div>
+        </div>
+      </div>
+
+      <!-- 오픈소스 지도 (Leaflet.js) -->
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="margin-bottom: 0;">📍 추천 식당 위치 (1~3위 및 추가 후보 마커)</label>
+          <span style="font-size: 11px; color: var(--text-muted);">마커를 클릭하면 상세 정보가 표시됩니다</span>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <!-- Top 3 비교 카드 테이블 -->
+      <div class="form-group">
+        <label class="form-label">🏆 공공데이터 다면 분석 1~3순위 추천 식당</label>
+        <div id="top3CardsContainer" class="top3-cards-grid"></div>
+      </div>
+
+      <!-- 추가 후보 식당 더보기 (4위 ~ 20위) -->
+      <div class="more-candidates-section">
+        <div class="more-header" id="btnToggleOthers">
+          <span class="more-title">📂 추가 후보 식당 더보기 (4위 ~ 20위) <span id="othersCountBadge" style="font-size: 12px; color: var(--primary); font-weight: normal;">(0개)</span></span>
+          <button type="button" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;" id="btnToggleOthersText">목록 보기 ▼</button>
+        </div>
+        <div id="othersContainer" style="display: none; margin-top: 14px; overflow-x: auto;">
+          <table class="more-table">
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>식당명</th>
+                <th>메뉴/업종</th>
+                <th>1인단가</th>
+                <th>면적/편의</th>
+                <th>위치</th>
+                <th>지도확인</th>
+              </tr>
+            </thead>
+            <tbody id="othersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 슬랙/카카오톡 텍스트 공지 생성 섹션 -->
+      <div class="notice-section">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label class="form-label" style="margin-bottom: 0;">📋 슬랙 / 카카오톡 팀 공유용 텍스트 공지문</label>
+          <button type="button" id="btnCopyNotice" class="btn btn-primary" style="font-size: 12px; padding: 6px 14px;">
+            📄 공지문 복사하기
+          </button>
+        </div>
+        <textarea id="noticeTextPreview" class="notice-textarea" readonly></textarea>
+        <div style="font-size: 11px; color: var(--text-muted); text-align: right;">
+          버튼을 누르면 메신저에 바로 붙여넣을 수 있는 텍스트가 복사됩니다.
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top: 24px;">
+        <button type="button" id="btnRestart" class="btn btn-secondary">🔄 조건 다시 설정하기</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- 스크립트 로드 -->
+  <script src="js/data.js"></script>
+  <script src="js/calculator.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
