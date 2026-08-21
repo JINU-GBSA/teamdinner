@@ -1,0 +1,10 @@
+﻿# Environment & cache
+.env
+.env.*
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

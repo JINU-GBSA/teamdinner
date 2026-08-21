@@ -1,229 +1,393 @@
 ﻿/**
- * [회식의 정석 - 메인 애플리케이션 컨트롤러]
+ * [회식의 정석 - TDS 인터랙션 & 리액티브 컨트롤러]
  */
 
 const AppState = {
   currentStep: 1,
-  candidateDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-27(목)", "2026-08-28(금)"],
-  members: [
-    { name: "김팀장", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-27(목)"] },
-    { name: "이수석", availableDates: ["2026-08-26(수)", "2026-08-27(목)", "2026-08-28(금)"] },
-    { name: "박책임", availableDates: ["2026-08-26(수)", "2026-08-27(목)"] },
-    { name: "최선임", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-28(금)"] },
-    { name: "정프로", availableDates: ["2026-08-26(수)"] },
-    { name: "강신입", availableDates: ["2026-08-26(수)", "2026-08-27(목)"] }
+  candidates: [
+    "2026-08-25(화)",
+    "2026-08-26(수)",
+    "2026-08-27(목)",
+    "2026-08-28(금)"
   ],
-  region: "분당구 전체",
-  preferredCategories: ["돼지고기/삼겹살", "소고기/한우"],
-  dislikedCategories: [],
-  targetBudget: 28000,
-  mustHaveParking: true,
-  mustHaveRoom: true,
-  mustCanReserve: true,
-  
-  result: {
-    schedule: null,
-    budget: null,
-    top3: [],
-    others: [],
-    totalMatched: 0
-  }
+  members: [],
+  preferences: {
+    region: "분당구 전체",
+    categories: ["돼지고기/삼겹살", "소고기/한우"],
+    dislikes: [],
+    targetBudget: 30000,
+    hasRoom: true,
+    hasParking: true,
+    canReserve: true
+  },
+  result: null
 };
 
+// 아바타 배경용 파스텔 색상 팔레트
+const AVATAR_COLORS = [
+  "#3182F6", // 토스 블루
+  "#00B06B", // 에메랄드
+  "#8B5CF6", // 퍼플
+  "#F59E0B", // 앰버
+  "#EC4899", // 핑크
+  "#06B6D4"  // 시안
+];
+
+const DOM = {};
+
 document.addEventListener("DOMContentLoaded", () => {
-  initUI();
-  bindEvents();
+  initDOM();
+  renderDateChips();
+  setupEventListeners();
+  updateStepper(1);
+  renderLiveVoteChart();
+  updateBudgetSummary();
 });
 
-function initUI() {
-  renderDateCheckboxes();
-  renderMemberList();
-  updateBudgetDisplay();
+function initDOM() {
+  DOM.steps = {
+    1: document.getElementById("step1"),
+    2: document.getElementById("step2"),
+    3: document.getElementById("step3"),
+    4: document.getElementById("step4")
+  };
+
+  DOM.stepperSteps = document.querySelectorAll(".stepper-step");
+  DOM.stepperTracks = document.querySelectorAll(".track-fill");
+
+  // Step 1
+  DOM.inputMemberName = document.getElementById("inputMemberName");
+  DOM.dateCheckboxesContainer = document.getElementById("dateCheckboxesContainer");
+  DOM.btnAddMember = document.getElementById("btnAddMember");
+  DOM.btnFillSample = document.getElementById("btnFillSample");
+  DOM.memberRowsContainer = document.getElementById("memberRowsContainer");
+  DOM.emptyMemberMsg = document.getElementById("emptyMemberMsg");
+  DOM.memberCountBadge = document.getElementById("memberCountBadge");
+  DOM.liveDateVoteChart = document.getElementById("liveDateVoteChart");
+  DOM.btnNextToStep2 = document.getElementById("btnNextToStep2");
+
+  // Step 2
+  DOM.regionCards = document.querySelectorAll(".region-card");
+  DOM.selectRegion = document.getElementById("selectRegion");
+  DOM.btnPrevToStep1 = document.getElementById("btnPrevToStep1");
+  DOM.btnNextToStep3 = document.getElementById("btnNextToStep3");
+
+  // Step 3
+  DOM.budgetSlider = document.getElementById("budgetSlider");
+  DOM.budgetValue = document.getElementById("budgetValue");
+  DOM.summaryMemberCount = document.getElementById("summaryMemberCount");
+  DOM.summaryTotalCost = document.getElementById("summaryTotalCost");
+  DOM.chkRoom = document.getElementById("chkRoom");
+  DOM.chkParking = document.getElementById("chkParking");
+  DOM.chkReserve = document.getElementById("chkReserve");
+  DOM.btnPrevToStep2 = document.getElementById("btnPrevToStep2");
+  DOM.btnCalculate = document.getElementById("btnCalculate");
+
+  // Step 4 (Result)
+  DOM.resBestDate = document.getElementById("resBestDate");
+  DOM.resAttendanceRate = document.getElementById("resAttendanceRate");
+  DOM.resTotalBudget = document.getElementById("resTotalBudget");
+  DOM.resPerPersonBudget = document.getElementById("resPerPersonBudget");
+  DOM.heroCardContainer = document.getElementById("heroCardContainer");
+  DOM.subTopContainer = document.getElementById("subTopContainer");
+  DOM.othersCountBadge = document.getElementById("othersCountBadge");
+  DOM.btnToggleOthers = document.getElementById("btnToggleOthers");
+  DOM.othersContainer = document.getElementById("othersContainer");
+  DOM.othersListContainer = document.getElementById("othersListContainer");
+  DOM.accordionArrow = document.getElementById("accordionArrow");
+  DOM.noticeTextPreview = document.getElementById("noticeTextPreview");
+  DOM.btnCopyNotice = document.getElementById("btnCopyNotice");
+  DOM.copyBtnText = document.getElementById("copyBtnText");
+  DOM.btnRestart = document.getElementById("btnRestart");
+
+  // Feedback Overlays
+  DOM.tossLoadingModal = document.getElementById("tossLoadingModal");
+  DOM.toastNotification = document.getElementById("toastNotification");
 }
 
-function bindEvents() {
-  // 예산 슬라이더
-  const budgetSlider = document.getElementById("budgetSlider");
-  if (budgetSlider) {
-    budgetSlider.addEventListener("input", (e) => {
-      AppState.targetBudget = parseInt(e.target.value, 10);
-      updateBudgetDisplay();
-    });
-  }
-
-  // 참석자 추가 폼
-  const btnAddMember = document.getElementById("btnAddMember");
-  if (btnAddMember) btnAddMember.addEventListener("click", handleAddMember);
-
-  // 샘플 팀원 자동 채우기
-  const btnFillSample = document.getElementById("btnFillSample");
-  if (btnFillSample) btnFillSample.addEventListener("click", handleFillSample);
-
-  // 위저드 네비게이션
-  const btnNextToStep2 = document.getElementById("btnNextToStep2");
-  const btnPrevToStep1 = document.getElementById("btnPrevToStep1");
-  const btnNextToStep3 = document.getElementById("btnNextToStep3");
-  const btnPrevToStep2 = document.getElementById("btnPrevToStep2");
-  const btnCalculate = document.getElementById("btnCalculate");
-  const btnRestart = document.getElementById("btnRestart");
-
-  if (btnNextToStep2) btnNextToStep2.addEventListener("click", () => goToStep(2));
-  if (btnPrevToStep1) btnPrevToStep1.addEventListener("click", () => goToStep(1));
-  if (btnNextToStep3) btnNextToStep3.addEventListener("click", () => goToStep(3));
-  if (btnPrevToStep2) btnPrevToStep2.addEventListener("click", () => goToStep(2));
-  if (btnCalculate) btnCalculate.addEventListener("click", handleCalculateAndRecommend);
-  if (btnRestart) btnRestart.addEventListener("click", () => goToStep(1));
-
-  // 추가 후보군 토글 버튼
-  const btnToggleOthers = document.getElementById("btnToggleOthers");
-  if (btnToggleOthers) {
-    btnToggleOthers.addEventListener("click", () => {
-      const container = document.getElementById("othersContainer");
-      const btnText = document.getElementById("btnToggleOthersText");
-      if (container.style.display === "none") {
-        container.style.display = "block";
-        btnText.textContent = "목록 접기 ▲";
-      } else {
-        container.style.display = "none";
-        btnText.textContent = "목록 보기 ▼";
-      }
-    });
-  }
-
-  // 텍스트 공지 복사 버튼
-  const btnCopyNotice = document.getElementById("btnCopyNotice");
-  if (btnCopyNotice) btnCopyNotice.addEventListener("click", copyNoticeText);
-}
-
-function renderDateCheckboxes() {
-  const container = document.getElementById("dateCheckboxesContainer");
-  if (!container) return;
-  container.innerHTML = "";
-  AppState.candidateDates.forEach((date, idx) => {
-    const label = document.createElement("label");
-    label.className = "checkbox-chip";
-    label.innerHTML = `
-      <input type="checkbox" name="memberDate" value="${date}" ${idx === 1 ? "checked" : ""}>
-      <span>${date}</span>
-    `;
-    container.appendChild(label);
-  });
-}
-
-function renderMemberList() {
-  const tbody = document.getElementById("memberTableBody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  AppState.members.forEach((m, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><strong>${m.name}</strong></td>
-      <td>${m.availableDates.map(d => `<span class="badge-date">${d}</span>`).join(" ")}</td>
-      <td>
-        <button type="button" class="btn-sm-del" onclick="deleteMember(${idx})">삭제</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
+function updateStepper(step) {
+  if (!DOM.stepperSteps) return;
+  DOM.stepperSteps.forEach(node => {
+    const s = parseInt(node.getAttribute("data-step"), 10);
+    node.classList.remove("active", "completed");
+    if (s === step) {
+      node.classList.add("active");
+    } else if (s < step) {
+      node.classList.add("completed");
+    }
   });
 
-  const countBadge = document.getElementById("memberCountBadge");
-  if (countBadge) countBadge.textContent = `현재 취합 인원: ${AppState.members.length}명`;
-}
-
-function handleAddMember() {
-  const nameInput = document.getElementById("inputMemberName");
-  const name = nameInput.value.trim();
-  if (!name) {
-    alert("참석자 이름을 입력해주세요.");
-    return;
-  }
-
-  const checkedDates = Array.from(document.querySelectorAll('input[name="memberDate"]:checked'))
-    .map(cb => cb.value);
-
-  if (checkedDates.length === 0) {
-    alert("가능한 날짜를 최소 1개 이상 선택해주세요.");
-    return;
-  }
-
-  AppState.members.push({ name, availableDates: checkedDates });
-  nameInput.value = "";
-  renderMemberList();
-}
-
-function deleteMember(idx) {
-  AppState.members.splice(idx, 1);
-  renderMemberList();
-}
-
-function handleFillSample() {
-  AppState.members = [
-    { name: "김팀장", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-27(목)"] },
-    { name: "이수석", availableDates: ["2026-08-26(수)", "2026-08-27(목)", "2026-08-28(금)"] },
-    { name: "박책임", availableDates: ["2026-08-26(수)", "2026-08-27(목)"] },
-    { name: "최선임", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-28(금)"] },
-    { name: "정프로", availableDates: ["2026-08-26(수)"] },
-    { name: "강신입", availableDates: ["2026-08-26(수)", "2026-08-27(목)"] }
-  ];
-  renderMemberList();
-}
-
-function updateBudgetDisplay() {
-  const budgetSlider = document.getElementById("budgetSlider");
-  const budgetValue = document.getElementById("budgetValue");
-  if (budgetSlider && budgetValue) {
-    budgetValue.textContent = parseInt(budgetSlider.value, 10).toLocaleString() + "원";
-  }
+  DOM.stepperTracks.forEach((track, idx) => {
+    if (step > idx + 1) {
+      track.style.width = "100%";
+    } else {
+      track.style.width = "0%";
+    }
+  });
 }
 
 function goToStep(step) {
   AppState.currentStep = step;
-  for (let i = 1; i <= 4; i++) {
-    const el = document.getElementById(`step${i}`);
-    if (el) el.classList.toggle("active", i === step);
+  Object.keys(DOM.steps).forEach(s => {
+    DOM.steps[s].classList.remove("active");
+  });
+  if (DOM.steps[step]) {
+    DOM.steps[step].classList.add("active");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  updateStepper(step);
 }
 
-function handleCalculateAndRecommend() {
-  try {
+function renderDateChips() {
+  DOM.dateCheckboxesContainer.innerHTML = "";
+  AppState.candidates.forEach((dateStr, idx) => {
+    const label = document.createElement("label");
+    label.className = "toss-date-chip";
+    label.innerHTML = `
+      <input type="checkbox" name="memberDateChoice" value="${dateStr}" ${idx === 0 || idx === 1 ? 'checked' : ''}>
+      <span>${dateStr}</span>
+    `;
+    DOM.dateCheckboxesContainer.appendChild(label);
+  });
+}
+
+function setupEventListeners() {
+  // Step 1: 멤버 추가
+  DOM.btnAddMember.addEventListener("click", handleAddMember);
+  DOM.inputMemberName.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") handleAddMember();
+  });
+
+  // Step 1: 샘플 채우기
+  DOM.btnFillSample.addEventListener("click", fillSampleData);
+
+  // Step 1 -> 2
+  DOM.btnNextToStep2.addEventListener("click", () => {
     if (AppState.members.length === 0) {
-      alert("최소 1명 이상의 참석자 일정이 필요합니다.");
-      goToStep(1);
+      showToast("팀원을 최소 1명 이상 등록해주세요");
+      DOM.inputMemberName.focus();
       return;
     }
+    goToStep(2);
+  });
 
-    const regionEl = document.getElementById("selectRegion");
-    if (regionEl) AppState.region = regionEl.value;
-    
-    AppState.preferredCategories = Array.from(document.querySelectorAll('input[name="categoryPref"]:checked'))
-      .map(cb => cb.value);
-    
-    AppState.dislikedCategories = Array.from(document.querySelectorAll('input[name="categoryDislike"]:checked'))
-      .map(cb => cb.value);
-
-    const chkParking = document.getElementById("chkParking");
-    const chkRoom = document.getElementById("chkRoom");
-    const chkReserve = document.getElementById("chkReserve");
-
-    AppState.mustHaveParking = chkParking ? chkParking.checked : false;
-    AppState.mustHaveRoom = chkRoom ? chkRoom.checked : false;
-    AppState.mustCanReserve = chkReserve ? chkReserve.checked : false;
-
-    const scheduleResult = DinnerCalculator.aggregateSchedule(AppState.members);
-    const budgetResult = DinnerCalculator.calculateBudget(scheduleResult.attendanceCount, AppState.targetBudget);
-    
-    const rankResult = DinnerCalculator.filterAndRankRestaurants({
-      region: AppState.region,
-      preferredCategories: AppState.preferredCategories,
-      dislikedCategories: AppState.dislikedCategories,
-      targetBudget: AppState.targetBudget,
-      mustHaveParking: AppState.mustHaveParking,
-      mustHaveRoom: AppState.mustHaveRoom,
-      mustCanReserve: AppState.mustCanReserve,
-      attendeeCount: scheduleResult.attendanceCount
+  // Step 2: 지역 카드 선택
+  DOM.regionCards.forEach(card => {
+    card.addEventListener("click", () => {
+      DOM.regionCards.forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      const regionVal = card.getAttribute("data-region");
+      DOM.selectRegion.value = regionVal;
+      showToast(`📍 [${regionVal}] 상권이 선택되었어요`);
     });
+  });
+
+  // Step 2 네비게이션
+  DOM.btnPrevToStep1.addEventListener("click", () => goToStep(1));
+  DOM.btnNextToStep3.addEventListener("click", () => {
+    const checkedPrefs = Array.from(document.querySelectorAll('input[name="categoryPref"]:checked')).map(el => el.value);
+    if (checkedPrefs.length === 0) {
+      showToast("선호하는 메뉴를 최소 1개 선택해주세요");
+      return;
+    }
+    updateBudgetSummary();
+    goToStep(3);
+  });
+
+  // Step 3: 예산 슬라이더 인터랙션
+  DOM.budgetSlider.addEventListener("input", (e) => {
+    const val = parseInt(e.target.value, 10);
+    DOM.budgetValue.innerText = val.toLocaleString();
+    updateBudgetSummary();
+  });
+
+  DOM.btnPrevToStep2.addEventListener("click", () => goToStep(2));
+
+  // Step 3: 분석 실행 (로딩 인터랙션 포함)
+  DOM.btnCalculate.addEventListener("click", () => {
+    // 1. 로딩 모달 펄스 연출
+    DOM.tossLoadingModal.style.display = "flex";
+    setTimeout(() => {
+      DOM.tossLoadingModal.style.display = "none";
+      executeRecommendation();
+    }, 550);
+  });
+
+  // Step 4: 아코디언 토글
+  DOM.btnToggleOthers.addEventListener("click", () => {
+    const isHidden = DOM.othersContainer.style.display === "none";
+    DOM.othersContainer.style.display = isHidden ? "block" : "none";
+    DOM.accordionArrow.innerText = isHidden ? "▲" : "▼";
+  });
+
+  // Step 4: 공지문 복사
+  DOM.btnCopyNotice.addEventListener("click", () => {
+    DOM.noticeTextPreview.select();
+    navigator.clipboard.writeText(DOM.noticeTextPreview.value).then(() => {
+      DOM.copyBtnText.innerText = "✓ 복사 완료!";
+      showToast("공지문이 클립보드에 복사되었어요 📋");
+      setTimeout(() => { DOM.copyBtnText.innerText = "📄 공지문 복사"; }, 2000);
+    }).catch(() => {
+      document.execCommand("copy");
+      showToast("공지문이 복사되었어요 📋");
+    });
+  });
+
+  // 처음으로
+  DOM.btnRestart.addEventListener("click", () => goToStep(1));
+}
+
+function handleAddMember() {
+  const name = DOM.inputMemberName.value.trim();
+  if (!name) {
+    showToast("참석자 이름을 입력해주세요");
+    DOM.inputMemberName.focus();
+    return;
+  }
+
+  const selectedDates = Array.from(
+    DOM.dateCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked')
+  ).map(cb => cb.value);
+
+  if (selectedDates.length === 0) {
+    showToast("가능한 날짜를 하나 이상 선택해주세요");
+    return;
+  }
+
+  AppState.members.push({ name, availableDates: selectedDates });
+  DOM.inputMemberName.value = "";
+  renderMemberList();
+  renderLiveVoteChart();
+  updateBudgetSummary();
+  showToast(`${name} 님이 등록되었어요`);
+}
+
+function fillSampleData() {
+  AppState.members = [
+    { name: "김팀장", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-27(목)"] },
+    { name: "이수석", availableDates: ["2026-08-26(수)", "2026-08-27(목)", "2026-08-28(금)"] },
+    { name: "박책임", availableDates: ["2026-08-25(화)", "2026-08-26(수)"] },
+    { name: "최선임", availableDates: ["2026-08-26(수)", "2026-08-27(목)"] },
+    { name: "정프로", availableDates: ["2026-08-25(화)", "2026-08-26(수)", "2026-08-28(금)"] },
+    { name: "강인턴", availableDates: ["2026-08-26(수)", "2026-08-27(목)", "2026-08-28(금)"] }
+  ];
+  renderMemberList();
+  renderLiveVoteChart();
+  updateBudgetSummary();
+  showToast("6인 팀원 데이터가 입력되었어요");
+}
+
+function renderMemberList() {
+  DOM.memberRowsContainer.innerHTML = "";
+  const count = AppState.members.length;
+  DOM.memberCountBadge.innerText = `${count}명 등록됨`;
+
+  if (count === 0) {
+    DOM.emptyMemberMsg.style.display = "block";
+    return;
+  }
+  DOM.emptyMemberMsg.style.display = "none";
+
+  AppState.members.forEach((m, idx) => {
+    const row = document.createElement("div");
+    row.className = "toss-member-item";
+
+    const dateBadges = m.availableDates.map(d => `<span class="mini-date-tag">${d}</span>`).join("");
+    const initial = m.name.charAt(0);
+    const bgColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+
+    row.innerHTML = `
+      <div class="member-info-left">
+        <div class="member-avatar-circle" style="background-color: ${bgColor};">${initial}</div>
+        <div>
+          <div class="member-name-txt">${m.name}</div>
+          <div class="member-dates-tags">${dateBadges}</div>
+        </div>
+      </div>
+      <button type="button" class="btn-del-icon" onclick="removeMember(${idx})" title="삭제">✕</button>
+    `;
+    DOM.memberRowsContainer.appendChild(row);
+  });
+}
+
+function renderLiveVoteChart() {
+  if (!DOM.liveDateVoteChart) return;
+  DOM.liveDateVoteChart.innerHTML = "";
+
+  const totalMembers = AppState.members.length;
+  const counts = {};
+  AppState.candidates.forEach(c => counts[c] = 0);
+
+  AppState.members.forEach(m => {
+    (m.availableDates || []).forEach(d => {
+      if (counts[d] !== undefined) counts[d]++;
+    });
+  });
+
+  let maxVotes = 0;
+  Object.values(counts).forEach(v => { if (v > maxVotes) maxVotes = v; });
+
+  AppState.candidates.forEach(dateStr => {
+    const voteCount = counts[dateStr] || 0;
+    const percent = totalMembers > 0 ? Math.round((voteCount / totalMembers) * 100) : 0;
+    const isLead = voteCount > 0 && voteCount === maxVotes;
+
+    const row = document.createElement("div");
+    row.className = "vote-bar-row";
+    row.innerHTML = `
+      <span class="vote-date-label">${dateStr}</span>
+      <div class="vote-bar-track">
+        <div class="vote-bar-fill ${isLead ? 'lead' : ''}" style="width: ${percent}%;"></div>
+      </div>
+      <span class="vote-count-label" style="color: ${isLead ? '#3182F6' : '#191F28'};">${voteCount}명 (${percent}%)</span>
+    `;
+    DOM.liveDateVoteChart.appendChild(row);
+  });
+}
+
+window.removeMember = function(idx) {
+  AppState.members.splice(idx, 1);
+  renderMemberList();
+  renderLiveVoteChart();
+  updateBudgetSummary();
+};
+
+function updateBudgetSummary() {
+  const memberCount = AppState.members.length > 0 ? AppState.members.length : 6;
+  const perPerson = parseInt(DOM.budgetSlider.value, 10);
+  const total = memberCount * perPerson;
+
+  if (DOM.summaryMemberCount) DOM.summaryMemberCount.innerText = memberCount;
+  if (DOM.summaryTotalCost) DOM.summaryTotalCost.innerText = `${total.toLocaleString()}원`;
+}
+
+function executeRecommendation() {
+  try {
+    const selectedRegion = DOM.selectRegion.value;
+    const categoryPrefs = Array.from(document.querySelectorAll('input[name="categoryPref"]:checked')).map(el => el.value);
+    const categoryDislikes = Array.from(document.querySelectorAll('input[name="categoryDislike"]:checked')).map(el => el.value);
+    const targetBudget = parseInt(DOM.budgetSlider.value, 10);
+    const hasRoom = DOM.chkRoom.checked;
+    const hasParking = DOM.chkParking.checked;
+    const canReserve = DOM.chkReserve.checked;
+
+    AppState.preferences = {
+      region: selectedRegion,
+      categories: categoryPrefs,
+      dislikes: categoryDislikes,
+      targetBudget: targetBudget,
+      hasRoom: hasRoom,
+      hasParking: hasParking,
+      canReserve: canReserve
+    };
+
+    const scheduleResult = DinnerCalculator.findBestDate(AppState.members, AppState.candidates);
+    const budgetResult = DinnerCalculator.calculateBudget(scheduleResult.attendingCount, targetBudget);
+    const rankResult = DinnerCalculator.rankRestaurants(
+      typeof RESTAURANT_DATA !== "undefined" ? RESTAURANT_DATA : [],
+      AppState.preferences,
+      budgetResult
+    );
 
     AppState.result = {
       schedule: scheduleResult,
@@ -241,173 +405,155 @@ function handleCalculateAndRecommend() {
     }, 150);
   } catch (err) {
     console.error("추천 계산 중 오류:", err);
-    alert("분석 중 오류가 발생했습니다: " + err.message);
+    showToast("분석 중 오류가 발생했습니다: " + err.message);
   }
 }
 
 function renderResults() {
-  const { schedule, budget, top3, others, totalMatched } = AppState.result;
+  const { schedule, budget, top3, others } = AppState.result;
 
-  const resBestDate = document.getElementById("resBestDate");
-  const resAttendanceRate = document.getElementById("resAttendanceRate");
-  const resTotalBudget = document.getElementById("resTotalBudget");
-  const resPerPersonBudget = document.getElementById("resPerPersonBudget");
+  DOM.resBestDate.innerText = schedule.bestDate || "일정 조율 필요";
+  DOM.resAttendanceRate.innerText = `${schedule.attendanceRate}% (${schedule.attendingCount}명)`;
+  DOM.resTotalBudget.innerText = `${budget.totalEstimated.toLocaleString()}원`;
+  DOM.resPerPersonBudget.innerText = `1인 약 ${budget.perPerson.toLocaleString()}원`;
 
-  if (resBestDate) resBestDate.textContent = schedule.bestDate || "미정";
-  if (resAttendanceRate) resAttendanceRate.textContent = `${schedule.rate}% (${schedule.attendanceCount}/${schedule.totalMembers}명)`;
-  if (resTotalBudget) resTotalBudget.textContent = budget.formattedTotal;
-  if (resPerPersonBudget) resPerPersonBudget.textContent = `${budget.perPersonBudget.toLocaleString()}원 / 1인`;
+  // 1. 🏆 Top 1 대형 히어로 카드
+  DOM.heroCardContainer.innerHTML = "";
+  if (top3.length > 0) {
+    const hero = top3[0];
+    const tagsHtml = (hero.tags || []).map(t => `<span class="hero-tag-item">#${t}</span>`).join("");
+    const reasonText = (hero.matchReasons && hero.matchReasons.length > 0) ? hero.matchReasons.join(" · ") : "조건에 완벽히 부합해요";
 
-  // Top 3 비교 카드
-  const container = document.getElementById("top3CardsContainer");
-  if (!container) return;
-  container.innerHTML = "";
+    const heroCard = document.createElement("div");
+    heroCard.className = "hero-restaurant-box";
+    heroCard.innerHTML = `
+      <div class="hero-top-row">
+        <div>
+          <h3 class="hero-main-name">${hero.name}</h3>
+        </div>
+        <div class="hero-score-pill">${hero.score}점</div>
+      </div>
+      <div class="hero-tags-flex">${tagsHtml}</div>
+      <div class="hero-match-badge">💡 <strong>추천 이유:</strong> ${reasonText}</div>
 
-  if (!top3 || top3.length === 0) {
-    container.innerHTML = `
-      <div class="empty-notice" style="grid-column: 1/-1; padding: 24px; text-align: center; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px;">
-        ⚠️ 선택하신 조건(지역: ${AppState.region})에 맞는 식당을 찾지 못했습니다.<br>
-        필수 옵션(주차/룸/예약)을 완화하거나 다른 메뉴를 선택해보세요!
+      <div class="hero-detail-grid">
+        <div>
+          <div class="detail-item-lbl">메뉴 및 업종</div>
+          <div class="detail-item-val">${hero.category}</div>
+        </div>
+        <div>
+          <div class="detail-item-lbl">1인 예상 단가</div>
+          <div class="detail-item-val highlight">${hero.avgPrice.toLocaleString()}원</div>
+        </div>
+        <div>
+          <div class="detail-item-lbl">매장 규모 / 편의</div>
+          <div class="detail-item-val">${hero.area || 50}㎡ ${hero.hasRoom ? '· 룸완비' : ''} ${hero.hasParking ? '· 주차' : ''}</div>
+        </div>
+        <div>
+          <div class="detail-item-lbl">위치 (주소)</div>
+          <div class="detail-item-val" style="font-size: 13px;">${hero.address_road || hero.address_jibun}</div>
+        </div>
+      </div>
+
+      <div class="hero-action-buttons">
+        <button type="button" class="toss-btn toss-btn-brand toss-btn-l" onclick="focusRestaurant(${hero.id}, ${hero.lat}, ${hero.lng})">
+          지도에서 위치 보기 📍
+        </button>
+        <a href="tel:${hero.tel}" class="toss-btn toss-btn-secondary toss-btn-l">
+          전화 문의 📞
+        </a>
       </div>
     `;
-    updateNoticePreview();
-    return;
+    DOM.heroCardContainer.appendChild(heroCard);
   }
 
-  const rankBadges = ["🥇 1순위 (Best Pick)", "🥈 2순위 (Great Choice)", "🥉 3순위 (Solid Pick)"];
-  const rankClasses = ["rank-gold", "rank-silver", "rank-bronze"];
-
-  top3.forEach((r, idx) => {
+  // 2. 🥈 🥉 2, 3순위 서브 카드
+  DOM.subTopContainer.innerHTML = "";
+  const subTops = top3.slice(1, 3);
+  subTops.forEach((r, idx) => {
+    const rankNum = idx + 2;
     const card = document.createElement("div");
-    card.className = `compare-card ${rankClasses[idx] || ""}`;
-
-    const tagsHtml = (r.tags || []).map(t => `<span class="tag-badge">#${t}</span>`).join("");
+    card.className = "subtop-card-item";
+    const tagsHtml = (r.tags || []).slice(0, 2).map(t => `<span class="hero-tag-item">#${t}</span>`).join("");
 
     card.innerHTML = `
-      <div class="card-header">
-        <span class="rank-tag">${rankBadges[idx] || `${idx + 1}순위`}</span>
-        <span class="score-tag">종합 ${r.score}점</span>
-      </div>
-      <h3 class="restaurant-name">${r.name}</h3>
-      <div style="margin-bottom: 6px;">${tagsHtml}</div>
-      <p class="restaurant-desc">${r.description || ""}</p>
-      
-      <div class="card-metrics">
-        <div class="metric-row">
-          <span class="metric-label">대표 메뉴/업종</span>
-          <span class="metric-value font-bold">${r.category}</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-label">1인 평균 단가</span>
-          <span class="metric-value font-bold text-blue">${r.avgPrice.toLocaleString()}원</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-label">팀 예상 총비용</span>
-          <span class="metric-value font-bold text-green">${r.estimatedTotal.toLocaleString()}원</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-label">면적 & 편의</span>
-          <span class="metric-value">
-            🏢${r.area || 50}㎡ | 
-            ${r.hasRoom ? '🚪단체룸' : '일반석'} | 
-            ${r.hasParking ? '🚗주차' : '주차불가'}
-          </span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-label">소재지(도로명)</span>
-          <span class="metric-value text-sm">${r.address_road || r.address_jibun}</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-label">예약 문의</span>
-          <span class="metric-value"><a href="tel:${r.tel}" class="tel-link">📞 ${r.tel}</a></span>
-        </div>
-      </div>
-
-      <div class="reasoning-box">
-        💡 <strong>선정 이유:</strong> ${r.reasoning}
+      <div class="subtop-rank-lbl">${rankNum === 2 ? '🥈 2순위 추천' : '🥉 3순위 추천'} (${r.score}점)</div>
+      <div class="subtop-item-name">${r.name}</div>
+      <div style="font-size: 13px; color: #6b7684; margin-bottom: 4px;">${r.category} · ${r.area || 50}㎡</div>
+      <div class="subtop-item-price">1인 약 ${r.avgPrice.toLocaleString()}원</div>
+      <div style="margin-bottom: 12px;">${tagsHtml}</div>
+      <div class="subtop-bottom-row">
+        <span style="font-size: 12px; color: #8b95a1;">${(r.address_road || r.address_jibun).split(' ').slice(2, 4).join(' ')}</span>
+        <button type="button" class="toss-btn toss-btn-secondary" style="font-size: 12px; padding: 4px 10px; border-radius: 8px;" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
+          지도 📍
+        </button>
       </div>
     `;
-    container.appendChild(card);
+    DOM.subTopContainer.appendChild(card);
   });
 
-  // 추가 후보군(4위 ~ 20위) 렌더링
-  const othersBadge = document.getElementById("othersCountBadge");
-  if (othersBadge) othersBadge.textContent = `(총 ${others.length}곳 / 전체 매칭 ${totalMatched}곳)`;
+  // 3. 📂 4위 ~ 20위 추가 후보군
+  DOM.othersCountBadge.innerText = `${others.length}개`;
+  DOM.othersListContainer.innerHTML = "";
+  others.forEach((r, idx) => {
+    const rankNum = idx + 4;
+    const row = document.createElement("div");
+    row.className = "others-row-item";
+    row.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="others-rank-badge">${rankNum}위</span>
+        <div>
+          <div class="others-row-name">${r.name}</div>
+          <div class="others-row-meta">${r.category} · 1인 약 ${r.avgPrice.toLocaleString()}원 · ${r.area || 50}㎡</div>
+        </div>
+      </div>
+      <button type="button" class="toss-btn toss-btn-text" onclick="focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
+        위치보기 ➔
+      </button>
+    `;
+    DOM.othersListContainer.appendChild(row);
+  });
 
-  const othersTbody = document.getElementById("othersTableBody");
-  if (othersTbody) {
-    othersTbody.innerHTML = "";
-    others.forEach((r, idx) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong style="color: #2563EB;">${idx + 4}위</strong></td>
-        <td><strong>${r.name}</strong> <span style="font-size: 11px; color: var(--text-muted);">(${r.score}점)</span></td>
-        <td>${r.category}</td>
-        <td>${r.avgPrice.toLocaleString()}원</td>
-        <td>${r.area}㎡ / ${r.hasRoom ? '🚪룸' : '홀'}</td>
-        <td style="font-size: 11px; max-width: 180px;">${r.address_road || r.address_jibun}</td>
-        <td>
-          <button type="button" class="btn-focus-map" onclick="DinnerMap.focusRestaurant(${r.id}, ${r.lat}, ${r.lng})">
-            지도보기 📍
-          </button>
-        </td>
-      `;
-      othersTbody.appendChild(tr);
-    });
-  }
-
-  updateNoticePreview();
+  generateNoticeText();
 }
 
-/**
- * 텍스트 공지문 포맷 생성기
- */
 function generateNoticeText() {
   const { schedule, budget, top3 } = AppState.result;
-  if (!schedule || !top3 || top3.length === 0) return "";
+  const bestDate = schedule.bestDate || "미정";
+  const attendingNames = (schedule.attendingMembers || []).join(", ");
 
-  let text = `📢 [팀 회식 안내 & 후보 식당 투표]\n\n`;
-  text += `🗓️ 일시: ${schedule.bestDate} (참석률 ${schedule.rate}%)\n`;
-  text += `👥 참석 확정: ${schedule.attendees.join(", ")} (총 ${schedule.attendanceCount}명)\n`;
-  if (schedule.absentees.length > 0) {
-    text += `⚠️ 불참/미정: ${schedule.absentees.join(", ")}\n`;
-  }
-  text += `💰 예상 예산: 1인당 약 ${budget.perPersonBudget.toLocaleString()}원 (총 약 ${budget.formattedTotal})\n`;
-  text += `📍 권역: ${AppState.region}\n\n`;
-  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🏆 [추천 식당 Top 3]\n`;
+  let notice = `[팀 회식 확정 공지 📢]\n\n`;
+  notice += `팀원 여러분의 투표 결과를 종합하여 최적의 회식 일정이 확정되었습니다!\n\n`;
+  notice += `🗓️ 일시: ${bestDate}\n`;
+  notice += `👥 참석 확정: ${attendingNames} (총 ${schedule.attendingCount}명 / 참석률 ${schedule.attendanceRate}%)\n`;
+  notice += `💰 1인 예상 예산: 약 ${budget.perPerson.toLocaleString()}원 (팀 총예산: 약 ${budget.totalEstimated.toLocaleString()}원)\n\n`;
+  notice += `🏆 추천 회식 장소 TOP 3\n`;
 
   top3.forEach((r, idx) => {
-    const tags = (r.tags || []).join(", ");
-    text += `\n${idx + 1}. ${r.name} (${r.category}) [${tags}]\n`;
-    text += `   • 1인단가: 약 ${r.avgPrice.toLocaleString()}원 (예상 총 ${r.estimatedTotal.toLocaleString()}원)\n`;
-    text += `   • 면적/편의: ${r.area}㎡, ${r.hasRoom ? '룸 완비' : '일반석'}, ${r.hasParking ? '주차 가능' : '주차 불가'}\n`;
-    text += `   • 주소: ${r.address_road || r.address_jibun}\n`;
-    text += `   • 추천사유: ${r.reasoning}\n`;
-    text += `   • 예약문의: ${r.tel}\n`;
+    notice += `\n${idx + 1}. [${r.name}] (${r.category})\n`;
+    notice += `   - 1인 예상 단가: 약 ${r.avgPrice.toLocaleString()}원\n`;
+    notice += `   - 매장 정보: ${r.tags.join(", ")} (면적 ${r.area || 50}㎡)\n`;
+    notice += `   - 위치: ${r.address_road || r.address_jibun}\n`;
+    notice += `   - 예약 문의: ${r.tel}\n`;
   });
 
-  text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `가장 마음에 드는 식당 번호를 스레드/답장으로 알려주세요! 😊`;
-
-  return text;
+  notice += `\n세부 장소 조율 및 예약은 위 추천 목록을 참고해 주세요! 감사합니다. ✨`;
+  DOM.noticeTextPreview.value = notice;
 }
 
-function updateNoticePreview() {
-  const preview = document.getElementById("noticeTextPreview");
-  if (preview) {
-    preview.value = generateNoticeText();
+window.focusRestaurant = function(id, lat, lng) {
+  DinnerMap.focusRestaurant(id, lat, lng);
+  const mapElement = document.getElementById("map");
+  if (mapElement) {
+    mapElement.scrollIntoView({ behavior: "smooth", block: "center" });
   }
-}
+};
 
-function copyNoticeText() {
-  const preview = document.getElementById("noticeTextPreview");
-  if (!preview) return;
-  preview.select();
-  navigator.clipboard.writeText(preview.value).then(() => {
-    alert("✅ 회식 공지 텍스트가 클립보드에 복사되었습니다!\n슬랙이나 카카오톡에 붙여넣어 공유하세요.");
-  }).catch(() => {
-    document.execCommand("copy");
-    alert("✅ 회식 공지 텍스트가 복사되었습니다!");
-  });
+function showToast(message) {
+  if (!DOM.toastNotification) return;
+  DOM.toastNotification.innerText = message;
+  DOM.toastNotification.classList.add("show");
+  setTimeout(() => {
+    DOM.toastNotification.classList.remove("show");
+  }, 2200);
 }
